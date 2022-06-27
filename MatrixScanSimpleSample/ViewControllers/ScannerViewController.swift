@@ -21,11 +21,18 @@ class ScannerViewController: UIViewController {
     private var barcodeTracking: BarcodeTracking!
     private var captureView: DataCaptureView!
     private var overlay: BarcodeTrackingBasicOverlay!
+    private var feedback: Feedback?
 
     private var results: [String: Barcode] = [:]
 
+    @objc static func instantiate() -> ScannerViewController {
+        let storyboard = UIStoryboard.init(name: "Main", bundle: nil)
+        return storyboard.instantiateViewController(withIdentifier: "ScannerVC") as! ScannerViewController
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
+        feedback = Feedback.default
         setupRecognition()
     }
 
@@ -51,11 +58,9 @@ class ScannerViewController: UIViewController {
         camera?.switch(toDesiredState: .off)
     }
 
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        guard let resultsViewController = segue.destination as? ResultViewController else {
-            return
-        }
-        resultsViewController.codes = Array(results.values)
+    @IBAction func handleDoneButtonTapped(_ sender: Any) {
+        print("*** Number of scanned barcodes: \(results.count)")
+        self.dismiss(animated: true, completion: nil)
     }
 
     @IBAction func unwindToScanner(segue: UIStoryboardSegue) {}
@@ -92,11 +97,7 @@ class ScannerViewController: UIViewController {
         // The settings instance initially has all types of barcodes (symbologies) disabled. For the purpose of this
         // sample we enable a very generous set of symbologies. In your own app ensure that you only enable the
         // symbologies that your app requires as every additional enabled symbology has an impact on processing times.
-        settings.set(symbology: .ean13UPCA, enabled: true)
-        settings.set(symbology: .ean8, enabled: true)
-        settings.set(symbology: .upce, enabled: true)
-        settings.set(symbology: .code39, enabled: true)
-        settings.set(symbology: .code128, enabled: true)
+        settings.set(symbology: .qr, enabled: true)
 
         // Create new barcode tracking mode with the settings from above.
         barcodeTracking = BarcodeTracking(context: context, settings: settings)
@@ -128,6 +129,9 @@ extension ScannerViewController: BarcodeTrackingListener {
         DispatchQueue.main.async { [weak self] in
             barcodes.forEach {
                 if let self = self, let data = $0.data, !data.isEmpty {
+                    if self.results[data] == nil {
+                        self.feedback?.emit()
+                    }
                     self.results[data] = $0
                 }
             }
